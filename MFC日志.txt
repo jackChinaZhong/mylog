@@ -1,0 +1,168 @@
+1.MFC 可读的Listview实现
+
+############头文件#############
+#pragma once
+#include "afxcmn.h"
+class CEditListCtrl :
+	public CListCtrl
+{
+public:
+	CEditListCtrl(void);
+	~CEditListCtrl(void);
+	CEdit * m_edit;//指向编辑框，初值为NULL
+	BOOL * m_isedit;//允许进行编辑的列，初值为NULL
+	int m_item;//当前编辑的行号，初值为-1
+	int m_subitem;//当前编辑的列号，初值为-1
+	DECLARE_MESSAGE_MAP()
+	afx_msg void OnNMClick(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnNMSetfocus(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	virtual BOOL DestroyWindow();
+};
+############CPP#############3
+
+#include "StdAfx.h"
+#include "EditListCtrl.h"
+#include "resource.h"
+
+
+CEditListCtrl::CEditListCtrl(void)
+{
+	m_edit = NULL;//编辑框的指针，初始为NULL，表示无编辑框
+    m_item = -1;//当前编辑的行号，初值为-1
+	m_subitem = -1;//当前编辑的列号，初值为-1
+}
+
+
+CEditListCtrl::~CEditListCtrl(void)
+{
+}
+BEGIN_MESSAGE_MAP(CEditListCtrl, CListCtrl)
+	ON_NOTIFY_REFLECT(NM_CLICK, &CEditListCtrl::OnNMClick)
+	ON_NOTIFY_REFLECT(NM_SETFOCUS, &CEditListCtrl::OnNMSetfocus)
+	ON_WM_HSCROLL()
+	ON_WM_VSCROLL()
+END_MESSAGE_MAP()
+
+
+void CEditListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
+{
+
+	LPNMITEMACTIVATE pMyList = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	if(!m_edit)
+	{
+		m_subitem=pMyList->iSubItem;
+		if(pMyList->iItem!=m_item)
+		{
+		   m_item=pMyList->iItem;//标志被单击的项目
+		   return;
+		}
+	}
+	RECT m_itemrect,m_r;
+	GetItemRect(m_item ,&m_itemrect,2);
+	GetItemRect(0 ,&m_r,2);
+	int m_height=m_itemrect.bottom -m_itemrect.top ;
+	int x=m_r.left ,y=m_r.top,cx,cy;//(x,y,cx,cy)为编辑框显示的位置
+	int i;
+	for(i=0;i< m_item;i++)
+		y+=m_height;
+		cy=y+m_height;
+	for(i=0;i<m_subitem;i++)
+	x+=GetColumnWidth(i);
+	cx=x+GetColumnWidth(i);
+	if(m_edit)//若编辑框已存在。
+	{
+		CString s1;
+		s1.Format ("%d %d %d %d",x,y,cx,cy);
+		m_edit->MoveWindow(x,y,cx-x,cy-y);//移动到当前子项目的位置。
+		 Invalidate();//刷新屏幕。
+		return;
+	}
+	//若编辑框不存在,则创建编辑框,并在当前子项目处显示编辑框。
+	CRect rect(x,y,cx,cy);
+	m_edit=new CEdit();
+	m_edit->Create (WS_CHILD|WS_VISIBLE|WS_BORDER,rect,this,ID_LISTEDIT);
+	CString str=GetItemText (pMyList->iItem,pMyList->iSubItem);
+	m_edit->UpdateData(0);
+	m_edit->SetWindowText(str); 
+	DWORD dwSel = m_edit->GetSel();   
+	m_edit->SetSel(HIWORD(dwSel), -1);   
+	m_edit->ShowWindow (SW_SHOW);//显示编辑框。
+	m_edit->SetFocus ();
+	*pResult = 0;
+}
+
+
+
+void CEditListCtrl::OnNMSetfocus(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	// TODO: 在此添加控件通知处理程序代码
+	if(m_edit)
+	{//将编辑框中的数据写回对应的子项目中
+		UpdateData( );
+		CString str;
+		m_edit->GetWindowText(str);
+		SetItemText(m_item,m_subitem,str);
+		delete m_edit;
+		m_edit=NULL;
+	}
+*pResult = 0;
+
+}
+
+
+void CEditListCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	//水平滚动时,移动已显示的编辑框。
+	LRESULT* pResult=new LRESULT;
+	if(m_edit)
+		OnNMClick((NMHDR*)this,pResult) ;
+	CListCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+}
+
+
+void CEditListCtrl::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+
+	CListCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+	LRESULT* pResult=new LRESULT;
+	if(m_edit)
+	{
+		RECT m_itemrect,m_headrect;
+		GetItemRect(m_item ,&m_itemrect,2);
+		GetHeaderCtrl()->GetWindowRect(&m_headrect);
+		if(m_itemrect.top<m_headrect.bottom-m_headrect.top) 
+		{
+		   RECT m_rect;
+		   m_edit->GetWindowRect(&m_rect);
+		   m_edit->MoveWindow(m_rect.left,-(m_rect.bottom-m_rect.top),m_rect.right,0);
+		}
+				else 
+		{
+		   OnNMClick((NMHDR*)this,pResult) ;
+		}
+	}
+}
+
+void CEditListCtrl::SetEditColomn(int col,BOOL edit)
+{//设置允许直接进行编辑的列
+	if(!m_isedit)
+	{
+	int len=GetHeaderCtrl()->GetItemCount();
+	m_isedit=new BOOL[len];
+	for(int i=0;i<len;i++)//初始化m_isedit。
+	   m_isedit[i]=FALSE;
+	}
+	m_isedit[col]=edit;
+}
+
+BOOL CEditListCtrl::DestroyWindow()
+{
+	// TODO: 在此添加专用代码和/或调用基类
+	delete [] m_isedit; 
+	return CListCtrl::DestroyWindow();
+}

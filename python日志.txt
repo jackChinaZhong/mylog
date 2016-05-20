@@ -1,0 +1,62 @@
+Model 字段
+1.ForeignKey、ManyToManyField 和 OneToOneField 都要求第一个参数是一个模型类，所以要使用 verbose_name 关键字参数才能指定
+2.试字段变成可选项 使用choices
+3.null 可以确定在数据库中为空 默认false 表示不为空
+4.blank 如果为true可以不用填写，默认false
+5.
+
+
+
+#################################
+模版
+1.遍历字典
+for value，key in dict
+	value key
+	
+2016-5-12 添加Django api rest_framework
+第一步：创建模型
+class DevType(models.Model):
+    devType = models.CharField(u'设备类型', max_length=10, primary_key=True)
+    devPart = models.CharField(u'所属部门', max_length=30)
+
+    class Meta:
+        ordering = ['devType']
+第二部：创建序列类（1，可以通过模型来使用；2，可以使用serializers.Serializer）这里使用的是第一种
+class DevTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DevType
+        fields = ('devType', 'devPart')
+
+
+第一种使用函数
+# Create your views here.
+@api_view(['GET','POST'])
+def list(reqeust,format=None):
+    if reqeust.method=='GET':
+        dp=DevType.objects.all()
+        serializer=DevTypeSerializer(dp,many=True)
+        return Response(serializer.data)
+    elif reqeust.method=='POST':
+        serializer=DevTypeSerializer(data=reqeust.DATA)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data,status=status.HTTP_201_CREATED)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+		
+第二种使用类
+class DevTypeList(APIView):
+    def get(self,request,format=None):
+        dp = DevType.objects.all()
+        serializer = DevTypeSerializer(dp, many=True)
+        return Response(serializer.data)
+    def post(self,request,format=None):
+        serializer = DevTypeSerializer(data=request.DATA)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+		
+		
+		
+#################
+snippets = serializers.PrimaryKeyRelatedField(many=True)		
